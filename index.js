@@ -1,11 +1,7 @@
 
-
-
 const sqlite3 = require('sqlite3');
-
 const { firefox, chromium } = require('playwright');
 const psl = require('psl');
-
 const { parse: urlparse } = require('url');
 const fs = require('fs');
 
@@ -119,13 +115,14 @@ async function collectCookiesAndLocalStorageFromStorageState(storageState, url) 
         value: value,
       }));
     });
+    const allItems = [
+      ...Array.isArray(firstPartyCookieItems) ? firstPartyCookieItems : [],
+      ...Array.isArray(thirdPartyCookieItems) ? thirdPartyCookieItems : [],
+      ...Array.isArray(firstPartyLocalStorageItems) ? firstPartyLocalStorageItems : [],
+      ...Array.isArray(thirdPartyLocalStorageItems) ? thirdPartyLocalStorageItems : [],
+    ];
   
-    return {
-      firstPartyCookieItems: firstPartyCookieItems,
-      thirdPartyCookieItems: thirdPartyCookieItems,
-      firstPartyLocalStorageItems: firstPartyLocalStorageItems,
-      thirdPartyLocalStorageItems: thirdPartyLocalStorageItems
-    };
+    return allItems;
   }
   
 
@@ -138,10 +135,10 @@ async function captureStorageState(url, browserType, page) {
     await page.goto(url);
     await page.waitForTimeout(5000);
     const storageState = await page.context().storageState();
-    const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
     // console.log(firstPartyLocalStorageItems);
-    const db = new sqlite3.Database('final5.db');
+    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -159,16 +156,6 @@ async function captureStorageState(url, browserType, page) {
           INSERT INTO items (request_id, type, key, value)
           VALUES (?, ?, ?, ?)
         `);
-
-        
-
-        const allItems = [
-          ...Array.isArray(firstPartyCookieItems) ? firstPartyCookieItems : [],
-          ...Array.isArray(thirdPartyCookieItems) ? thirdPartyCookieItems : [],
-          ...Array.isArray(firstPartyLocalStorageItems) ? firstPartyLocalStorageItems : [],
-          ...Array.isArray(thirdPartyLocalStorageItems) ? thirdPartyLocalStorageItems : [],
-        ];
-
         for (const item of allItems) {
           cookieStmt.run(requestId, item['type'], item['key'], item['value']);
         }
@@ -192,10 +179,11 @@ async function captureStorageState(url, browserType, page) {
     await page.goto(url);
     await page.waitForTimeout(5000);
     const storageState = await page.context().storageState();
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    const db = new sqlite3.Database('final5.db');
+    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -213,14 +201,6 @@ async function captureStorageState(url, browserType, page) {
           INSERT INTO items (request_id, type, key, value)
           VALUES (?, ?, ?, ?)
         `);
-        
-
-        const allItems = [
-          ...Array.isArray(firstPartyCookieItems) ? firstPartyCookieItems : [],
-          ...Array.isArray(thirdPartyCookieItems) ? thirdPartyCookieItems : [],
-          ...Array.isArray(firstPartyLocalStorageItems) ? firstPartyLocalStorageItems : [],
-          ...Array.isArray(thirdPartyLocalStorageItems) ? thirdPartyLocalStorageItems : [],
-        ];
         
 
         for (const item of allItems) {
@@ -243,9 +223,10 @@ async function captureStorageState(url, browserType, page) {
     await page.goto(url);
     await page.waitForTimeout(5000);
     const storageState = await page.context().storageState();
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
-    const db = new sqlite3.Database('final5.db');
+    // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -263,13 +244,6 @@ async function captureStorageState(url, browserType, page) {
           INSERT INTO items (request_id, type, key, value)
           VALUES (?, ?, ?, ?)
         `);
-    
-        const allItems = [
-          ...Array.isArray(firstPartyCookieItems) ? firstPartyCookieItems : [],
-          ...Array.isArray(thirdPartyCookieItems) ? thirdPartyCookieItems : [],
-          ...Array.isArray(firstPartyLocalStorageItems) ? firstPartyLocalStorageItems : [],
-          ...Array.isArray(thirdPartyLocalStorageItems) ? thirdPartyLocalStorageItems : [],
-        ];
         
         for (const item of allItems) {
           cookieStmt.run(requestId, item['type'], item['key'], item['value']);
@@ -296,9 +270,10 @@ async function captureStorageState(url, browserType, page) {
     await page.goto(url);
     await page.waitForTimeout(5000);
     const storageState = await page.context().storageState();
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
-    const db = new sqlite3.Database('final5.db');
+    // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -316,13 +291,6 @@ async function captureStorageState(url, browserType, page) {
           INSERT INTO items (request_id, type, key, value)
           VALUES (?, ?, ?, ?)
         `);
-    
-        const allItems = [
-          ...Array.isArray(firstPartyCookieItems) ? firstPartyCookieItems : [],
-          ...Array.isArray(thirdPartyCookieItems) ? thirdPartyCookieItems : [],
-          ...Array.isArray(firstPartyLocalStorageItems) ? firstPartyLocalStorageItems : [],
-          ...Array.isArray(thirdPartyLocalStorageItems) ? thirdPartyLocalStorageItems : [],
-        ];
         
         for (const item of allItems) {
           cookieStmt.run(requestId, item['type'], item['key'], item['value']);
@@ -351,11 +319,11 @@ async function captureStorageState(url, browserType, page) {
 
 // const urls = ['https://www.nytimes.com', "https://www.akamai.net", 'https://www.bbc.com', "https://linkedin.com", "https://microsoft.com", "https://live.com", "https://reddit.com", "https://wordpress.org", "https://vimeo.com", "https://yandex.ru","https://cloudflare.com",  "https://a-msedge.net", "https://googleusercontent.com","https://trafficmanager.net","https://tribune.com.pk", 'https://stackoverflow.com'];
 const browserTypes = ['chrome', 'chromefresh' ,'firefox', 'brave'];
-const urls = ['https://www.bbc.com'];
+const urls = ['https://www.nytimes.com','https://www.bbc.com'];
 
 async function captureAll() {
 
-  const db = new sqlite3.Database('final5.db');
+  const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
 
   // Create the tables
   db.run(`
@@ -394,6 +362,7 @@ async function captureAll() {
           page = page || await browser.newPage();
 
           await captureStorageState(url, 'chrome', page);
+          fs.rmdirSync(userDataDir, { recursive: true });
           await captureStorageState(url, 'chrome', page);
 
           await page.goto('about:blank'); // navigate to a blank page to reset the page state
