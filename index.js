@@ -6,6 +6,8 @@ const { parse: urlparse } = require('url');
 const fs = require('fs');
 
 
+const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+
 function extractHostname(url) {
   let hostname;
   //find & remove protocol (http, ftp, etc.) and get hostname
@@ -85,15 +87,17 @@ async function collectCookiesAndLocalStorageFromStorageState(storageState, url) 
       type: 'Ist_party_cookie',
       key: cookie.cookie.name,
       value: cookie.cookie.value,
+      domain: cookie.cookie.domain,
     }));
-    // console.log(firstPartyCookieItems);
+     console.log(firstPartyCookieItems);
   
     const thirdPartyCookieItems = thirdPartyCookies.map(cookie => ({
       type: '3rd_party_cookie',
       key: cookie.cookie.name,
       value: cookie.cookie.value,
+      domain: cookie.cookie.domain,
     }));
-    // console.log(thirdPartyCookieItems);
+    console.log(thirdPartyCookieItems);
 
     const firstPartyLocalStorageItems = firstPartyLocalStorage.flatMap(obj => {
       return obj.localStorage.map(({ name, value }) => ({
@@ -138,7 +142,7 @@ async function captureStorageState(url, browserType, page) {
     const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
     // console.log(firstPartyLocalStorageItems);
-    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+    
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -153,11 +157,11 @@ async function captureStorageState(url, browserType, page) {
         requestId = this.lastID;
 
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value)
+          INSERT INTO items (request_id, type, key, value, domain)
           VALUES (?, ?, ?, ?)
         `);
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value']);
+          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
         }
       }
     });
@@ -183,7 +187,7 @@ async function captureStorageState(url, browserType, page) {
     
     // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+    
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -198,13 +202,13 @@ async function captureStorageState(url, browserType, page) {
         requestId = this.lastID;
 
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value)
+          INSERT INTO items (request_id, type, key, value, domain)
           VALUES (?, ?, ?, ?)
         `);
         
 
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value']);
+          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
         }
       }
     });
@@ -225,8 +229,7 @@ async function captureStorageState(url, browserType, page) {
     const storageState = await page.context().storageState();
     const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
-    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+    
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -241,12 +244,12 @@ async function captureStorageState(url, browserType, page) {
         requestId = this.lastID;
     
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value)
+          INSERT INTO items (request_id, type, key, value, domain)
           VALUES (?, ?, ?, ?)
         `);
         
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value']);
+          cookieStmt.run(requestId, item['type'], item['key'], item['value'],item['domain']);
         }
       }
     });
@@ -272,8 +275,7 @@ async function captureStorageState(url, browserType, page) {
     const storageState = await page.context().storageState();
     const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
-    // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
-    const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+  
 
     const requestStmt = db.prepare(`
       INSERT INTO requests (user_agent, url, redirect_url, status_code)
@@ -288,12 +290,12 @@ async function captureStorageState(url, browserType, page) {
         requestId = this.lastID;
     
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value)
+          INSERT INTO items (request_id, type, key, value, domain)
           VALUES (?, ?, ?, ?)
         `);
         
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value']);
+          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
         }
       }
     });
@@ -323,7 +325,7 @@ const urls = ['https://www.nytimes.com','https://www.bbc.com'];
 
 async function captureAll() {
 
-  const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+ 
 
   // Create the tables
   db.run(`
@@ -343,6 +345,7 @@ async function captureAll() {
       type TEXT NOT NULL CHECK (type IN ('Ist_party_cookie', '3rd_party_cookie', 'Ist_party_local_storage', '3rd_party_local_storage')),
       key TEXT ,
       value TEXT  ,
+      domain TEXT,
       FOREIGN KEY (request_id) REFERENCES requests (id)
     )
   `);
