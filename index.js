@@ -1,12 +1,26 @@
 
+(async () => {
+
+
 const sqlite3 = require('sqlite3');
 const { firefox, chromium } = require('playwright');
 const psl = require('psl');
 const { parse: urlparse } = require('url');
 const fs = require('fs');
+const fsPromises = fs.promises;
 
 
-const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/final5.db');
+const db = new sqlite3.Database('/Users/a/Web-Storage-Diff-Analysis/browser.db');
+
+const browserTypes = ['chrome', 'chromefresh' ,'firefox', 'brave'];
+
+const urls = (await fsPromises.readFile('file2.csv'))
+.toString()
+.split("\n")
+.map((line) => line.split(',')[1]?.trim())
+.filter((site) => site);
+
+
 
 function extractHostname(url) {
   let hostname;
@@ -89,7 +103,7 @@ async function collectCookiesAndLocalStorageFromStorageState(storageState, url) 
       value: cookie.cookie.value,
       domain: cookie.cookie.domain,
     }));
-     console.log(firstPartyCookieItems);
+     
   
     const thirdPartyCookieItems = thirdPartyCookies.map(cookie => ({
       type: '3rd_party_cookie',
@@ -97,26 +111,26 @@ async function collectCookiesAndLocalStorageFromStorageState(storageState, url) 
       value: cookie.cookie.value,
       domain: cookie.cookie.domain,
     }));
-    console.log(thirdPartyCookieItems);
+    
 
     const firstPartyLocalStorageItems = firstPartyLocalStorage.flatMap(obj => {
       return obj.localStorage.map(({ name, value }) => ({
         type: 'Ist_party_local_storage',
         key: name,
         value: value,
+        domain: obj.origin,
       }));
     });
     
 
   
   
-    // console.log(firstPartyLocalStorageItems);
-  
     const thirdPartyLocalStorageItems = thirdPartyLocalStorage.flatMap(obj => {
       return obj.localStorage.map(({ name, value }) => ({
         type: '3rd_party_local_storage',
         key: name,
         value: value,
+        domain: obj.origin,
       }));
     });
     const allItems = [
@@ -134,14 +148,18 @@ async function collectCookiesAndLocalStorageFromStorageState(storageState, url) 
 async function captureStorageState(url, browserType, page) {
   let browser;
   let requestId; // declare requestId
+  try {
+
   if (browserType === 'chrome') {
     page = page || await browser.newPage();
-    await page.goto(url);
-    await page.waitForTimeout(5000);
+    const response = await page.goto(url);
+    await page.waitForTimeout(20000);
+    const status_code = response.status();
+    const redirect_url = page.url();
     const storageState = await page.context().storageState();
-    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, redirect_url);
     
-    // console.log(firstPartyLocalStorageItems);
+    
     
 
     const requestStmt = db.prepare(`
@@ -150,26 +168,23 @@ async function captureStorageState(url, browserType, page) {
     `);
 
 
-    requestStmt.run(browserType, url, null, 200, function(err) {
+    requestStmt.run(browserType, url, redirect_url, status_code, function(err) {
       if (err) {
         console.error(err.message);
       } else {
         requestId = this.lastID;
 
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value, domain)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO items (request_id, type, domain, key, value)
+          VALUES (?, ?, ?, ?,?)
         `);
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
+          cookieStmt.run(requestId, item['type'], item['domain'], item['key'], item['value']);
         }
       }
     });
 
       requestStmt.finalize();
-    
-      
-    
 
  
    
@@ -177,13 +192,14 @@ async function captureStorageState(url, browserType, page) {
     const userDataDir = `/Users/a/web-storage/newlibrary/new2${url.replace(/\W/g, '_')}`;
     browser = await chromium.launchPersistentContext(userDataDir, {
       // headless: false,
-      // additional options for context can be passed here
     });
-    page = page || await browser.newPage();
-    await page.goto(url);
-    await page.waitForTimeout(5000);
+    page = await browser.newPage();
+    const response = await page.goto(url);
+    await page.waitForTimeout(20000);
+    const status_code = response.status();
+    const redirect_url = page.url();
     const storageState = await page.context().storageState();
-    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, redirect_url);
     
     // const { firstPartyCookieItems, thirdPartyCookieItems, firstPartyLocalStorageItems, thirdPartyLocalStorageItems } = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
     
@@ -195,20 +211,20 @@ async function captureStorageState(url, browserType, page) {
     `);
 
     
-    requestStmt.run(browserType, url, null, 200, function(err) {
+    requestStmt.run(browserType, url, redirect_url, status_code, function(err) {
       if (err) {
         console.error(err.message);
       } else {
         requestId = this.lastID;
 
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value, domain)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO items (request_id, type, domain, key, value)
+          VALUES (?, ?, ?, ?,?)
         `);
         
 
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
+          cookieStmt.run(requestId, item['type'], item['domain'], item['key'], item['value']);
         }
       }
     });
@@ -216,18 +232,20 @@ async function captureStorageState(url, browserType, page) {
 
     requestStmt.finalize();
 
-    await page.goto('about:blank'); // navigate to a blank page to reset the page state
+    // await page.goto('about:blank'); // navigate to a blank page to reset the page state
     await page.close();
     await browser.close(); 
   
   
   } else if (browserType === 'firefox') {
     browser = await firefox.launch();
-    page = page || await browser.newPage();
-    await page.goto(url);
-    await page.waitForTimeout(5000);
+    page = await browser.newPage();
+    const response = await page.goto(url);
+    await page.waitForTimeout(20000);
+    const status_code = response.status();
+    const redirect_url = page.url();
     const storageState = await page.context().storageState();
-    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, redirect_url);
     
     
 
@@ -237,19 +255,19 @@ async function captureStorageState(url, browserType, page) {
     `);
     
     
-    requestStmt.run(browserType, url, null, 200, function(err) {
+    requestStmt.run(browserType, url, redirect_url, status_code, function(err) {
       if (err) {
         console.error(err.message);
       } else {
         requestId = this.lastID;
     
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value, domain)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO items (request_id, type, domain, key, value)
+          VALUES (?, ?, ?, ?,?)
         `);
         
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value'],item['domain']);
+          cookieStmt.run(requestId, item['type'],item['domain'], item['key'], item['value']);
         }
       }
     });
@@ -269,11 +287,13 @@ async function captureStorageState(url, browserType, page) {
        headless: false,
       executablePath: '/Applications/Brave Browser 3.app/Contents/MacOS/Brave Browser',
     });
-    page = page || await browser.newPage();
-    await page.goto(url);
-    await page.waitForTimeout(5000);
+    page = await browser.newPage();
+    const response = await page.goto(url);
+    await page.waitForTimeout(20000);
+    const status_code = response.status();
+    const redirect_url = page.url();
     const storageState = await page.context().storageState();
-    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, url);
+    const allItems = await collectCookiesAndLocalStorageFromStorageState(storageState, redirect_url);
     
   
 
@@ -283,19 +303,19 @@ async function captureStorageState(url, browserType, page) {
     `);
     
     
-    requestStmt.run(browserType, url, null, 200, function(err) {
+    requestStmt.run(browserType, url, redirect_url, status_code, function(err) {
       if (err) {
         console.error(err.message);
       } else {
         requestId = this.lastID;
     
         const cookieStmt = db.prepare(`
-          INSERT INTO items (request_id, type, key, value, domain)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO items (request_id, type , domain, key, value)
+          VALUES (?, ?, ?, ?,?)
         `);
         
         for (const item of allItems) {
-          cookieStmt.run(requestId, item['type'], item['key'], item['value'], item['domain']);
+          cookieStmt.run(requestId, item['type'], item['domain'], item['key'], item['value']);
         }
       }
     });
@@ -308,20 +328,18 @@ async function captureStorageState(url, browserType, page) {
   
 
   
-
+  
   
   } 
-  
-  
-  else {
-    throw new Error(`Invalid browser type: ${browserType}`);
+} catch(error){ console.error(error.message);
+  if (browser) {
+    await browser.close();
   }
-  return {browser, page }
 }
+}
+  
+  
 
-// const urls = ['https://www.nytimes.com', "https://www.akamai.net", 'https://www.bbc.com', "https://linkedin.com", "https://microsoft.com", "https://live.com", "https://reddit.com", "https://wordpress.org", "https://vimeo.com", "https://yandex.ru","https://cloudflare.com",  "https://a-msedge.net", "https://googleusercontent.com","https://trafficmanager.net","https://tribune.com.pk", 'https://stackoverflow.com'];
-const browserTypes = ['chrome', 'chromefresh' ,'firefox', 'brave'];
-const urls = ['https://www.nytimes.com','https://www.bbc.com'];
 
 async function captureAll() {
 
@@ -343,9 +361,9 @@ async function captureAll() {
       id INTEGER PRIMARY KEY,
       request_id INTEGER ,
       type TEXT NOT NULL CHECK (type IN ('Ist_party_cookie', '3rd_party_cookie', 'Ist_party_local_storage', '3rd_party_local_storage')),
+      domain TEXT,
       key TEXT ,
       value TEXT  ,
-      domain TEXT,
       FOREIGN KEY (request_id) REFERENCES requests (id)
     )
   `);
@@ -360,31 +378,33 @@ async function captureAll() {
           const userDataDir = `/Users/a/web-storage/newlibrary/new2${url.replace(/\W/g, '_')}`;
           const browser = await chromium.launchPersistentContext(userDataDir, {
             // headless: false,
-            // additional options for context can be passed here
+            
           });
           page = page || await browser.newPage();
 
-          await captureStorageState(url, 'chrome', page);
+          await captureStorageState("http://"+ url, 'chrome', page);
           fs.rmdirSync(userDataDir, { recursive: true });
-          await captureStorageState(url, 'chrome', page);
+          await captureStorageState("http://" + url, 'chrome', page);
 
           await page.goto('about:blank'); // navigate to a blank page to reset the page state
           await page.close();
           await browser.close();
         } else if (browserType === 'chromefresh') {
-          await captureStorageState(url, 'chromefresh');
+          await captureStorageState("http://" + url, 'chromefresh');
         } 
         else if (browserType === 'firefox') {
-          await captureStorageState(url, 'firefox');
+          await captureStorageState("http://" + url, 'firefox');
         }
         else if (browserType === 'brave'){
-          await captureStorageState(url, 'brave');
+          await captureStorageState("http://" + url, 'brave');
         }
       }catch (error) {
         console.error(`Error processing ${url} with ${browserType}: ${error}`);
+       
       }
     }
   }
 }
 
 captureAll();
+})();
